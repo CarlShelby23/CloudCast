@@ -15,13 +15,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cloudcast.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (String, String) -> Unit
+    onLoginSuccess: (GoogleSignInAccount) -> Unit
 ) {
     val context = LocalContext.current
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -29,7 +30,6 @@ fun LoginScreen(
     val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestEmail()
         .requestScopes(Scope("https://www.googleapis.com/auth/drive.readonly"))
-        .requestIdToken(context.getString(R.string.default_web_client_id))
         .build()
 
     val googleSignInClient = GoogleSignIn.getClient(context, gso)
@@ -41,44 +41,42 @@ fun LoginScreen(
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)
-                val email = account?.email ?: "Usuario Desconocido"
-                val dummyToken = "Bearer_Token_Simulado"
-
-                Log.d("CloudCastAuth", "Autenticado con éxito: $email")
-                onLoginSuccess(email, dummyToken)
-
+                if (account != null) {
+                    Log.d("CloudCastAuth", "Autenticado: ${account.email}")
+                    onLoginSuccess(account)
+                }
             } catch (e: ApiException) {
-                errorMessage = "Error al iniciar sesión: Código ${e.statusCode}"
+                errorMessage = "Error de autenticación: ${e.statusCode}"
                 Log.e("CloudCastAuth", "Fallo el login", e)
             }
         } else {
-            errorMessage = "Inicio de sesión cancelado"
+            errorMessage = "Autenticación cancelada"
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "CloudCast",
-            fontSize = 48.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontSize = 42.sp,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Tu nube multimedia personal",
+            text = "Tu centro multimedia personal",
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(64.dp))
+        Spacer(modifier = Modifier.height(48.dp))
 
         Button(
             onClick = {
@@ -87,18 +85,17 @@ fun LoginScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            shape = MaterialTheme.shapes.medium
+                .height(56.dp)
         ) {
-            Text(text = "Conectar con Google Drive", fontSize = 18.sp)
+            Text(text = "Conectar con Google Drive", fontSize = 16.sp)
         }
 
         if (errorMessage != null) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = errorMessage!!,
                 color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium
+                fontSize = 14.sp
             )
         }
     }
