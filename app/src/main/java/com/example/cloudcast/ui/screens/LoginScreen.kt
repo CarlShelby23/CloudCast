@@ -13,26 +13,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cloudcast.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (GoogleSignInAccount) -> Unit
+    onLoginSuccess: (GoogleSignInAccount, GoogleSignInClient) -> Unit
 ) {
     val context = LocalContext.current
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestEmail()
-        .requestScopes(Scope("https://www.googleapis.com/auth/drive.readonly"))
-        .build()
-
-    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope("https://www.googleapis.com/auth/drive.readonly"))
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -43,7 +44,7 @@ fun LoginScreen(
                 val account = task.getResult(ApiException::class.java)
                 if (account != null) {
                     Log.d("CloudCastAuth", "Autenticado: ${account.email}")
-                    onLoginSuccess(account)
+                    onLoginSuccess(account, googleSignInClient)
                 }
             } catch (e: ApiException) {
                 errorMessage = "Error de autenticación: ${e.statusCode}"

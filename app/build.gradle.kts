@@ -21,7 +21,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("cloudcast-debug.jks")
+            storePassword = "cloudcast123"
+            keyAlias = "cloudcast"
+            keyPassword = "cloudcast123"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -30,6 +42,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -55,12 +68,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
     // Room (Base de datos local)
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
-    // Nota: Necesitas el plugin de KSP arriba en tu archivo gradle para el compilador de Room
-    // ksp("androidx.room:room-compiler:$room_version")
 
     // Retrofit & Gson (Para la API de Google Drive)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
