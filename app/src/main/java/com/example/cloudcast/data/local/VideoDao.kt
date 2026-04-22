@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface VideoDao {
     @Query("SELECT * FROM videos")
-    fun getAllVideos(): Flow<List<VideoEntity>> // Flow avisa a la UI en tiempo real
+    fun getAllVideos(): Flow<List<VideoEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVideos(videos: List<VideoEntity>)

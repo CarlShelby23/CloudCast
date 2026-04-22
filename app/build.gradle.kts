@@ -69,23 +69,18 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Room (Base de datos local)
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 
-    // Retrofit & Gson (Para la API de Google Drive)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
-    // Coil (Para cargar las miniaturas en Compose)
     implementation("io.coil-kt:coil-compose:2.5.0")
 
-    // Media3 - ExoPlayer (Para el reproductor de video futuro)
     val media3_version = "1.2.1"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
 
-    // Google Auth (Para el Login OAuth 2.0)
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 }

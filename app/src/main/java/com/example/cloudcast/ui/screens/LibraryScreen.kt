@@ -3,17 +3,21 @@ package com.example.cloudcast.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,62 +32,40 @@ fun LibraryScreen(
     onVideoClick: (String) -> Unit,
     onSignOut: () -> Unit
 ) {
-    // Diálogo de confirmación para cerrar sesión
-    var showSignOutDialog by remember { mutableStateOf(false) }
-
-    if (showSignOutDialog) {
-        AlertDialog(
-            onDismissRequest = { showSignOutDialog = false },
-            title = { Text("Cerrar sesión") },
-            text = { Text("¿Seguro que quieres cerrar sesión? Tendrás que volver a conectar tu cuenta de Google.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showSignOutDialog = false
-                    onSignOut()
-                }) {
-                    Text("Cerrar sesión", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSignOutDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mi Nube (CloudCast)") },
+                title = {
+                    Text(
+                        "CloudCast",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 actions = {
-                    IconButton(onClick = { showSignOutDialog = true }) {
+                    IconButton(onClick = onSignOut) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ExitToApp,
-                            contentDescription = "Cerrar sesión",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            contentDescription = "Cerrar sesión"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         }
     ) { paddingValues ->
         if (videoList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No se encontraron videos en tu Drive",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Text("No hay videos en la base de datos.")
             }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.padding(paddingValues)
             ) {
                 items(videoList) { video ->
@@ -100,50 +82,54 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
-            .padding(4.dp)
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Box {
+        Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
                 model = video.thumbnail ?: "https://via.placeholder.com/300x400/2C2C2C/FFFFFF?text=Sin+Portada",
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentDescription = "Portada de ${video.title}",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(0.85f)),
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
                             startY = 250f
                         )
                     )
             )
+
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(0.5f))
-                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .align(Alignment.Center),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Rounded.PlayArrow,
+                    imageVector = Icons.Rounded.PlayArrow,
                     contentDescription = "Reproducir",
                     tint = Color.White,
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.size(32.dp)
                 )
             }
+
             Text(
                 text = video.title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
-                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(12.dp),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                    .padding(12.dp)
             )
         }
     }
