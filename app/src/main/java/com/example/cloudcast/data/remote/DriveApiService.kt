@@ -5,17 +5,38 @@ import retrofit2.http.Header
 import retrofit2.http.Query
 
 interface DriveApiService {
+    // Cargar videos desde Drive
     @GET("drive/v3/files")
     suspend fun getDriveVideos(
         @Header("Authorization") token: String,
         @Query("q") query: String = "mimeType contains 'video/' and trashed = false",
-        @Query("fields") fields: String = "files(id, name, thumbnailLink, webContentLink, mimeType)",
-        @Query("pageSize") pageSize: Int = 50
+        @Query("fields") fields: String = "nextPageToken,files(id,name,thumbnailLink,webContentLink,mimeType,size,modifiedTime)",
+        @Query("pageSize") pageSize: Int = 100,
+        @Query("orderBy") orderBy: String = "name"
+    ): DriveResponse
+
+    // Paginación / siguiente página
+    @GET("drive/v3/files")
+    suspend fun getDriveVideosPage(
+        @Header("Authorization") token: String,
+        @Query("q") query: String = "mimeType contains 'video/' and trashed = false",
+        @Query("fields") fields: String = "nextPageToken,files(id,name,thumbnailLink,webContentLink,mimeType,size,modifiedTime)",
+        @Query("pageSize") pageSize: Int = 100,
+        @Query("pageToken") pageToken: String
     ): DriveResponse
 }
 
-data class DriveResponse(val files: List<DriveFileDto>)
+data class DriveResponse(
+    val files: List<DriveFileDto>,
+    val nextPageToken: String? = null
+)
+
 data class DriveFileDto(
-    val id: String, val name: String, val thumbnailLink: String?,
-    val webContentLink: String?, val mimeType: String
+    val id: String,
+    val name: String,
+    val thumbnailLink: String?,
+    val webContentLink: String?,
+    val mimeType: String,
+    val size: String? = null,
+    val modifiedTime: String? = null
 )

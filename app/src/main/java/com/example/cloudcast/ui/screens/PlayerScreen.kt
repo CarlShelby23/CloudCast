@@ -4,29 +4,42 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     videoUrl: String,
     accessToken: String,
+    videoTitle: String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -39,7 +52,6 @@ fun PlayerScreen(
             )
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
                 .createMediaSource(MediaItem.fromUri(videoUrl))
-
             setMediaSource(mediaSource)
             prepare()
             playWhenReady = true
@@ -48,25 +60,42 @@ fun PlayerScreen(
 
     var isFullscreen by remember { mutableStateOf(false) }
 
-    // Handle back press: exit fullscreen if active, otherwise go back to library
+    var isPlaying by remember { mutableStateOf(true) }
+
+    var showOverlay by remember { mutableStateOf(true) }
+
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            isPlaying = exoPlayer.isPlaying
+            delay(500)
+        }
+    }
+
+    LaunchedEffect(showOverlay) {
+        if (showOverlay) {
+            delay(3000)
+            showOverlay = false
+        }
+    }
+
     BackHandler {
         if (isFullscreen) {
             isFullscreen = false
         } else {
+            exoPlayer.release()
             onBack()
         }
     }
 
     LaunchedEffect(isFullscreen) {
         activity?.let {
-            val windowInsetsController = WindowCompat.getInsetsController(it.window, it.window.decorView)
-
+            val ctrl = WindowCompat.getInsetsController(it.window, it.window.decorView)
             if (isFullscreen) {
-                windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-                windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                ctrl.hide(WindowInsetsCompat.Type.systemBars())
+                ctrl.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             } else {
-                windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+                ctrl.show(WindowInsetsCompat.Type.systemBars())
                 it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
@@ -76,26 +105,73 @@ fun PlayerScreen(
         onDispose {
             exoPlayer.release()
             activity?.let {
-                val windowInsetsController = WindowCompat.getInsetsController(it.window, it.window.decorView)
-                windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+                WindowCompat.getInsetsController(it.window, it.window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
                 it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = true
 
-                    setFullscreenButtonClickListener { isFullScreenClicked ->
-                        isFullscreen = isFullScreenClicked
+                    // UC06 - Listener del botón fullscreen del controlador nativo
+                    setFullscreenButtonClickListener { clicked ->
+                        isFullscreen = clicked
                     }
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        AnimatedVisibility(
+            visible = showOverlay || !isPlaying,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    if (isFullscreen) isFullscreen = false
+                    else { exoPlayer.release(); onBack() }
+                }) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = Color.White
+                    )
+                }
+
+                Text(
+                    text = videoTitle,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                )
+
+                Icon(
+                    imageVector = if (isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.PauseCircle,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
     }
 }

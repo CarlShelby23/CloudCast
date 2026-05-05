@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -26,6 +27,7 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -38,6 +40,7 @@ fun LoginScreen(
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        isLoading = false
         if (result.resultCode == Activity.RESULT_OK) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
@@ -47,8 +50,8 @@ fun LoginScreen(
                     onLoginSuccess(account, googleSignInClient)
                 }
             } catch (e: ApiException) {
-                errorMessage = "Error de autenticación: ${e.statusCode}"
-                Log.e("CloudCastAuth", "Fallo el login", e)
+                errorMessage = "Error de autenticación (código ${e.statusCode})"
+                Log.e("CloudCastAuth", "Falló el login", e)
             }
         } else {
             errorMessage = "Autenticación cancelada"
@@ -58,10 +61,17 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Text(
+            text = "☁️",
+            fontSize = 72.sp
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             text = "CloudCast",
             fontSize = 42.sp,
@@ -69,35 +79,55 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.primary
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Tu centro multimedia personal",
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Tu centro multimedia personal\ndesde Google Drive",
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(56.dp))
 
         Button(
             onClick = {
                 errorMessage = null
+                isLoading = true
                 launcher.launch(googleSignInClient.signInIntent)
             },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            Text(text = "Conectar con Google Drive", fontSize = 16.sp)
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text(text = "Conectar con Google Drive", fontSize = 16.sp)
+            }
         }
 
         if (errorMessage != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = errorMessage!!,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 14.sp
-            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(12.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

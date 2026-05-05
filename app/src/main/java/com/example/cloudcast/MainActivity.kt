@@ -4,18 +4,20 @@ import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable // <- Importación vital para sobrevivir a la rotación
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.example.cloudcast.data.local.HistorialEntry
+import com.example.cloudcast.data.local.LocalStorage
 import com.example.cloudcast.data.remote.RetrofitClient
 import com.example.cloudcast.domain.model.VideoItem
 import com.example.cloudcast.ui.screens.LibraryScreen
@@ -29,21 +31,27 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+
     private var isUserLoggedIn by mutableStateOf(false)
     private var videoList by mutableStateOf<List<VideoItem>>(emptyList())
+    private var historial by mutableStateOf<List<HistorialEntry>>(emptyList())
     private var isLoading by mutableStateOf(false)
-
+    private var isRefreshing by mutableStateOf(false)
     private var currentAccessToken by mutableStateOf<String?>(null)
-
     private var signInClient: GoogleSignInClient? = null
+    private var currentAccount: GoogleSignInAccount? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val storage = LocalStorage.getInstance(this)
+
+        // Restaurar sesion automaticamente
         val existingAccount = GoogleSignIn.getLastSignedInAccount(this)
         if (existingAccount != null) {
             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -51,51 +59,85 @@ class MainActivity : ComponentActivity() {
                 .requestScopes(Scope("https://www.googleapis.com/auth/drive.readonly"))
                 .build()
             signInClient = GoogleSignIn.getClient(this, gso)
+            currentAccount = existingAccount
             isUserLoggedIn = true
-            fetchVideosFromDrive(this, existingAccount)
+            fetchVideos(this, existingAccount, storage)
+        }
+
+        lifecycleScope.launch {
+            storage.historial.collectLatest { entries -> historial = entries }
         }
 
         setContent {
             CloudCastTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
-                    var selectedVideoUrl by rememberSaveable { mutableStateOf<String?>(null) }
+                    var selectedVideoId by rememberSaveable { mutableStateOf<String?>(null) }
+                    var selectedVideoTitle by rememberSaveable { mutableStateOf("") }
 
-                    BackHandler(enabled = selectedVideoUrl != null) {
-                        selectedVideoUrl = null
-                    }
+                    BackHandler(enabled = selectedVideoId != null) { selectedVideoId = null }
 
-                    if (!isUserLoggedIn) {
-                        LoginScreen(
-                            onLoginSuccess = { account, client ->
-                                signInClient = client
-                                isUserLoggedIn = true
-                                fetchVideosFromDrive(this@MainActivity, account)
-                            }
-                        )
-                    } else {
-                        if (isLoading) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    when {
+                        !isUserLoggedIn -> {
+                            // Login
+                            LoginScreen(
+                                onLoginSuccess = { account, client ->
+                                    signInClient = client
+                                    currentAccount = account
+                                    isUserLoggedIn = true
+                                    fetchVideos(this@MainActivity, account, storage)
+                                }
+                            )
+                        }
+                        isLoading -> {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator()
                             }
-                        } else {
-                            if (selectedVideoUrl == null) {
-                                LibraryScreen(
-                                    videoList = videoList,
-                                    onVideoClick = { clickedVideoId ->
-                                        selectedVideoUrl = "https://www.googleapis.com/drive/v3/files/${clickedVideoId}?alt=media"
-                                    },
-                                    onSignOut = { signOut() }
-                                )
-                            } else {
-                                PlayerScreen(
-                                    videoUrl = selectedVideoUrl!!,
-                                    accessToken = currentAccessToken ?: "",
-                                    onBack = {
-                                        selectedVideoUrl = null
+                        }
+                        selectedVideoId != null -> {
+                            // Reproductor
+                            val url = "https://www.googleapis.com/drive/v3/files/${selectedVideoId}?alt=media"
+                            PlayerScreen(
+                                videoUrl = url,
+                                accessToken = currentAccessToken ?: "",
+                                videoTitle = selectedVideoTitle,
+                                onBack = { selectedVideoId = null }
+                            )
+                        }
+                        else -> {
+                            // Biblioteca
+                            LibraryScreen(
+                                videoList = videoList,
+                                historial = historial,
+                                isRefreshing = isRefreshing,
+                                userEmail = currentAccount?.email ?: "",
+                                userDisplayName = currentAccount?.displayName ?: "Usuario",
+                                userPhotoUrl = currentAccount?.photoUrl?.toString(),
+                                onVideoClick = { clickedId ->
+                                    val video = videoList.find { it.id == clickedId }
+                                    selectedVideoId = clickedId
+                                    selectedVideoTitle = video?.title ?: ""
+                                    video?.let {
+                                        storage.addToHistorial(
+                                            HistorialEntry(driveId = it.id, title = it.title, thumbnailUrl = it.thumbnail)
+                                        )
                                     }
-                                )
-                            }
+                                },
+                                onSignOut = { signOut() },
+                                onToggleFavorite = { video ->
+                                    val newFav = !video.isFavorite
+                                    storage.setFavorite(video.id, newFav)
+                                    videoList = videoList.map {
+                                        if (it.id == video.id) it.copy(isFavorite = newFav) else it
+                                    }
+                                },
+                                onRefresh = {
+                                    currentAccount?.let { acc ->
+                                        isRefreshing = true
+                                        fetchVideos(this@MainActivity, acc, storage, isRefresh = true)
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -109,29 +151,47 @@ class MainActivity : ComponentActivity() {
             videoList = emptyList()
             signInClient = null
             currentAccessToken = null
+            currentAccount = null
         }
     }
 
-    private fun fetchVideosFromDrive(context: Context, account: GoogleSignInAccount) {
-        isLoading = true
+    private fun fetchVideos(
+        context: Context,
+        account: GoogleSignInAccount,
+        storage: LocalStorage,
+        isRefresh: Boolean = false
+    ) {
+        if (!isRefresh) isLoading = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val scopes = "oauth2:https://www.googleapis.com/auth/drive.readonly"
                 val token = GoogleAuthUtil.getToken(context, account.account!!, scopes)
-
                 currentAccessToken = token
 
                 val response = RetrofitClient.instance.getDriveVideos("Bearer $token")
+                val favIds = storage.getFavIds()
+
                 val items = response.files.map {
-                    VideoItem(it.id, it.name, it.thumbnailLink?.replace("=s220", "=s500"))
+                    VideoItem(
+                        id = it.id,
+                        title = it.name,
+                        thumbnail = it.thumbnailLink?.replace("=s220", "=s500"),
+                        mimeType = it.mimeType,
+                        isFavorite = it.id in favIds
+                    )
                 }
+
                 withContext(Dispatchers.Main) {
                     videoList = items
                     isLoading = false
+                    isRefreshing = false
                 }
             } catch (e: Exception) {
                 Log.e("CloudCast", "Error al cargar videos", e)
-                withContext(Dispatchers.Main) { isLoading = false }
+                withContext(Dispatchers.Main) {
+                    isLoading = false
+                    isRefreshing = false
+                }
             }
         }
     }
