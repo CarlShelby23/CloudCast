@@ -124,7 +124,6 @@ fun PlayerScreen(
                     player = exoPlayer
                     useController = true
 
-                    setShowRepeatToggle(true) 
 
                     setFullscreenButtonClickListener { clicked ->
                         isFullscreen = clicked

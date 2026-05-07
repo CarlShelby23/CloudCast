@@ -1,7 +1,6 @@
 package com.example.cloudcast.data.local
 
 import android.content.Context
-import com.example.cloudcast.domain.model.VideoItem
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
@@ -18,8 +17,6 @@ class LocalStorage(context: Context) {
     private val prefs = context.getSharedPreferences("cloudcast_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    // Flows internos
-
     private val _favIds = MutableStateFlow(loadFavIds())
     val favIds: Flow<Set<String>> = _favIds.asStateFlow()
 
@@ -28,8 +25,6 @@ class LocalStorage(context: Context) {
 
     private val _isDarkMode = MutableStateFlow<Boolean?>(loadDarkMode())
     val isDarkMode: Flow<Boolean?> = _isDarkMode.asStateFlow()
-
-    // Favoritos
 
     private fun loadFavIds(): Set<String> {
         val json = prefs.getString(KEY_FAV_IDS, null) ?: return emptySet()
@@ -47,8 +42,6 @@ class LocalStorage(context: Context) {
 
     fun getFavIds(): Set<String> = _favIds.value
 
-    // Historial
-
     private fun loadHistorial(): List<HistorialEntry> {
         val json = prefs.getString(KEY_HISTORIAL, null) ?: return emptyList()
         return gson.fromJson(json, object : TypeToken<List<HistorialEntry>>() {}.type)
@@ -56,7 +49,7 @@ class LocalStorage(context: Context) {
 
     fun addToHistorial(entry: HistorialEntry) {
         val current = _historial.value.toMutableList()
-        current.removeAll { it.driveId == entry.driveId }   // evitar duplicados
+        current.removeAll { it.driveId == entry.driveId }
         current.add(0, entry)
         val trimmed = current.take(50)
         prefs.edit().putString(KEY_HISTORIAL, gson.toJson(trimmed)).apply()
