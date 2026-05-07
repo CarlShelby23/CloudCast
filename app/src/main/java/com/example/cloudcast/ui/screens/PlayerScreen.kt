@@ -40,7 +40,8 @@ fun PlayerScreen(
     videoUrl: String,
     accessToken: String,
     videoTitle: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onDownload: () -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -123,7 +124,8 @@ fun PlayerScreen(
                     player = exoPlayer
                     useController = true
 
-                    // UC06 - Listener del botón fullscreen del controlador nativo
+                    setShowRepeatToggle(true) 
+
                     setFullscreenButtonClickListener { clicked ->
                         isFullscreen = clicked
                     }
@@ -164,6 +166,14 @@ fun PlayerScreen(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(end = 8.dp)
                 )
+
+                IconButton(onClick = onDownload) {
+                    Icon(
+                        imageVector = Icons.Rounded.Download,
+                        contentDescription = "Descargar video",
+                        tint = Color.White
+                    )
+                }
 
                 Icon(
                     imageVector = if (isPlaying) Icons.Rounded.PlayArrow else Icons.Rounded.PauseCircle,

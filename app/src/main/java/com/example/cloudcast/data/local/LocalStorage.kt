@@ -26,6 +26,9 @@ class LocalStorage(context: Context) {
     private val _historial = MutableStateFlow(loadHistorial())
     val historial: Flow<List<HistorialEntry>> = _historial.asStateFlow()
 
+    private val _isDarkMode = MutableStateFlow<Boolean?>(loadDarkMode())
+    val isDarkMode: Flow<Boolean?> = _isDarkMode.asStateFlow()
+
     // Favoritos
 
     private fun loadFavIds(): Set<String> {
@@ -67,9 +70,23 @@ class LocalStorage(context: Context) {
 
     fun getHistorial(): List<HistorialEntry> = _historial.value
 
+    private fun loadDarkMode(): Boolean? {
+        return if (prefs.contains(KEY_DARK_MODE)) {
+            prefs.getBoolean(KEY_DARK_MODE, false)
+        } else null
+    }
+
+    fun toggleDarkMode(currentSystemTheme: Boolean) {
+        val currentPref = _isDarkMode.value ?: currentSystemTheme
+        val newTheme = !currentPref
+        prefs.edit().putBoolean(KEY_DARK_MODE, newTheme).apply()
+        _isDarkMode.value = newTheme
+    }
+
     companion object {
         private const val KEY_FAV_IDS  = "fav_ids"
         private const val KEY_HISTORIAL = "historial"
+        private const val KEY_DARK_MODE = "dark_mode"
 
         @Volatile private var INSTANCE: LocalStorage? = null
 

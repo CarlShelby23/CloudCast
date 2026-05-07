@@ -59,7 +59,10 @@ fun LibraryScreen(
     isRefreshing: Boolean,
     userEmail: String,
     userDisplayName: String,
-    userPhotoUrl: String?
+    userPhotoUrl: String?,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    onDownloadRequest: (String, String) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -176,6 +179,12 @@ fun LibraryScreen(
                                 }
                             }
                         }
+                        IconButton(onClick = onToggleTheme) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
+                                contentDescription = if (isDarkTheme) "Cambiar a tema claro" else "Cambiar a tema oscuro"
+                            )
+                        }
                         IconButton(onClick = onRefresh, enabled = !isRefreshing) {
                             if (isRefreshing)
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -256,14 +265,24 @@ fun LibraryScreen(
                     VideoCard(
                         video = video,
                         onClick = { onVideoClick(video.id) },
-                        onFavoriteToggle = { onToggleFavorite(video) },    // UC15
-                        onShare = {                                           // UC18
+                        onFavoriteToggle = { onToggleFavorite(video) },
+                        onShare = {
+                            val videoLink = "https://drive.google.com/file/d/${video.id}/view?usp=sharing"
+
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Enlace de CloudCast", videoLink)
+                            clipboard.setPrimaryClip(clip)
+                            
+                            Toast.makeText(context, "Enlace copiado al portapapeles", Toast.LENGTH_SHORT).show()
+
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "Mira este video en CloudCast: ${video.title}")
+                                putExtra(Intent.EXTRA_TITLE, video.title)
+                                putExtra(Intent.EXTRA_TEXT, "Mira este video en CloudCast: ${video.title}\n$videoLink")
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Compartir video"))
-                        }
+                        },
+                        onDownload = { onDownloadRequest(video.id, video.title) }
                     )
                 }
             }
@@ -278,7 +297,8 @@ fun VideoCard(
     video: VideoItem,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onDownload: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -334,6 +354,13 @@ fun VideoCard(
                 modifier = Modifier.align(Alignment.TopStart)
             ) {
                 Icon(Icons.Rounded.Share, "Compartir", tint = Color.White)
+            }
+
+            IconButton(
+                onClick = onDownload,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 8.dp)
+            ) {
+                Icon(Icons.Rounded.Download, "Descargar", tint = Color.White)
             }
 
             Text(
