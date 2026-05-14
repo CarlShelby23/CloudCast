@@ -5,11 +5,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,14 +31,12 @@ import coil.compose.AsyncImage
 import com.example.cloudcast.data.local.HistorialEntry
 import com.example.cloudcast.domain.model.VideoItem
 
-// Opciones de orden
 enum class OrdenVideos(val label: String) {
     NOMBRE_AZ("Nombre A→Z"),
     NOMBRE_ZA("Nombre Z→A"),
     RECIENTES("Más recientes")
 }
 
-// Filtros de pestaña
 enum class TabFiltro(val label: String) {
     TODOS("Todos"),
     FAVORITOS("Favoritos"),
@@ -56,6 +52,7 @@ fun LibraryScreen(
     onSignOut: () -> Unit,
     onToggleFavorite: (VideoItem) -> Unit,
     onRefresh: () -> Unit,
+    onClearHistory: () -> Unit,
     isRefreshing: Boolean,
     userEmail: String,
     userDisplayName: String,
@@ -63,21 +60,16 @@ fun LibraryScreen(
 ) {
     val context = LocalContext.current
 
-    // Estados
-
     var showSignOutDialog by remember { mutableStateOf(false) }
-
     var searchQuery by remember { mutableStateOf("") }
     var searchActive by remember { mutableStateOf(false) }
-
     var tabActiva by remember { mutableStateOf(TabFiltro.TODOS) }
-
     var ordenActual by remember { mutableStateOf(OrdenVideos.NOMBRE_AZ) }
     var showOrdenMenu by remember { mutableStateOf(false) }
-
     var showPerfilDialog by remember { mutableStateOf(false) }
 
-    // Diálogo para cerrar sesión
+    // Estado para el diálogo de información técnica
+    var showInfoForVideo by remember { mutableStateOf<VideoItem?>(null) }
 
     if (showSignOutDialog) {
         AlertDialog(
@@ -94,8 +86,6 @@ fun LibraryScreen(
             }
         )
     }
-
-    // Diálogo de Perfil del usuario
 
     if (showPerfilDialog) {
         AlertDialog(
@@ -123,25 +113,47 @@ fun LibraryScreen(
         )
     }
 
+    showInfoForVideo?.let { video ->
+        AlertDialog(
+            onDismissRequest = { showInfoForVideo = null },
+            title = { Text("Detalles del video") },
+            text = {
+                Column {
+                    Text("Formato: ${video.mimeType}", modifier = Modifier.padding(bottom = 4.dp))
+                    val sizeMb = video.sizeBytes?.let { it / (1024 * 1024) } ?: 0
+                    Text("Tamaño: $sizeMb MB", modifier = Modifier.padding(bottom = 4.dp))
+
+                    val durationMin = video.durationMillis?.let { it / 1000 / 60 } ?: 0
+                    val durationSec = video.durationMillis?.let { (it / 1000) % 60 } ?: 0
+                    Text("Duración: $durationMin min $durationSec seg", modifier = Modifier.padding(bottom = 4.dp))
+
+                    val dateFormatted = video.createdTime?.take(10) ?: "Desconocido"
+                    Text("Fecha de subida: $dateFormatted")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfoForVideo = null }) { Text("Cerrar") }
+            }
+        )
+    }
+
     val listaFiltrada = remember(videoList, historial, searchQuery, tabActiva, ordenActual) {
         val base: List<VideoItem> = when (tabActiva) {
             TabFiltro.TODOS -> videoList
-            TabFiltro.FAVORITOS -> videoList.filter { it.isFavorite }      // UC16
-            TabFiltro.HISTORIAL -> {                                         // UC17
+            TabFiltro.FAVORITOS -> videoList.filter { it.isFavorite }
+            TabFiltro.HISTORIAL -> {
                 val idsOrdenados = historial.map { it.driveId }
                 idsOrdenados.mapNotNull { id -> videoList.find { it.id == id } }.distinct()
             }
         }
 
-        // Filtrar por búsqueda
         val buscado = if (searchQuery.isBlank()) base
         else base.filter { it.title.contains(searchQuery, ignoreCase = true) }
 
-        // Aplicar orden
         when (ordenActual) {
             OrdenVideos.NOMBRE_AZ -> buscado.sortedBy { it.title.lowercase() }
             OrdenVideos.NOMBRE_ZA -> buscado.sortedByDescending { it.title.lowercase() }
-            OrdenVideos.RECIENTES -> buscado  // el orden de Drive ya es cronológico
+            OrdenVideos.RECIENTES -> buscado
         }
     }
 
@@ -151,6 +163,11 @@ fun LibraryScreen(
                 TopAppBar(
                     title = { Text("CloudCast") },
                     actions = {
+                        AnimatedVisibility(visible = tabActiva == TabFiltro.HISTORIAL && historial.isNotEmpty()) {
+                            IconButton(onClick = onClearHistory) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Limpiar historial")
+                            }
+                        }
                         IconButton(onClick = { showPerfilDialog = true }) {
                             Icon(Icons.Rounded.AccountCircle, contentDescription = "Perfil")
                         }
@@ -239,7 +256,7 @@ fun LibraryScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = if (searchActive) "Sin resultados para \"$searchQuery\""
-                               else "No hay videos en esta sección",
+                        else "No hay videos en esta sección",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -256,8 +273,9 @@ fun LibraryScreen(
                     VideoCard(
                         video = video,
                         onClick = { onVideoClick(video.id) },
-                        onFavoriteToggle = { onToggleFavorite(video) },    // UC15
-                        onShare = {                                           // UC18
+                        onFavoriteToggle = { onToggleFavorite(video) },
+                        onInfoClick = { showInfoForVideo = video },
+                        onShare = {
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_TEXT, "Mira este video en CloudCast: ${video.title}")
@@ -271,13 +289,12 @@ fun LibraryScreen(
     }
 }
 
-// Tarjeta de video
-
 @Composable
 fun VideoCard(
     video: VideoItem,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
+    onInfoClick: () -> Unit,
     onShare: () -> Unit
 ) {
     Card(
@@ -329,11 +346,13 @@ fun VideoCard(
                 )
             }
 
-            IconButton(
-                onClick = onShare,
-                modifier = Modifier.align(Alignment.TopStart)
-            ) {
-                Icon(Icons.Rounded.Share, "Compartir", tint = Color.White)
+            Row(modifier = Modifier.align(Alignment.TopStart)) {
+                IconButton(onClick = onShare) {
+                    Icon(Icons.Rounded.Share, "Compartir", tint = Color.White)
+                }
+                IconButton(onClick = onInfoClick) {
+                    Icon(Icons.Rounded.Info, "Detalles", tint = Color.White)
+                }
             }
 
             Text(

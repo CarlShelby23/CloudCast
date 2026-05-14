@@ -1,6 +1,8 @@
 package com.example.cloudcast
 
+import android.app.PictureInPictureParams
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -47,12 +49,14 @@ class MainActivity : ComponentActivity() {
     private var signInClient: GoogleSignInClient? = null
     private var currentAccount: GoogleSignInAccount? = null
 
+    // Variable para controlar PiP
+    private var isPlayingVideo = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val storage = LocalStorage.getInstance(this)
 
-        // Restaurar sesion automaticamente
         val existingAccount = GoogleSignIn.getLastSignedInAccount(this)
         if (existingAccount != null) {
             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -76,11 +80,13 @@ class MainActivity : ComponentActivity() {
                     var selectedVideoId by rememberSaveable { mutableStateOf<String?>(null) }
                     var selectedVideoTitle by rememberSaveable { mutableStateOf("") }
 
+                    // Actualizamos el estado de reproducción para PiP
+                    isPlayingVideo = selectedVideoId != null
+
                     BackHandler(enabled = selectedVideoId != null) { selectedVideoId = null }
 
                     when {
                         !isUserLoggedIn -> {
-                            // Login
                             LoginScreen(
                                 onLoginSuccess = { account, client ->
                                     signInClient = client
@@ -96,7 +102,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         selectedVideoId != null -> {
-                            // Reproductor
                             val url = "https://www.googleapis.com/drive/v3/files/${selectedVideoId}?alt=media"
                             PlayerScreen(
                                 videoUrl = url,
@@ -109,7 +114,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         else -> {
-                            // Biblioteca
                             LibraryScreen(
                                 videoList = videoList,
                                 historial = historial,
@@ -140,12 +144,21 @@ class MainActivity : ComponentActivity() {
                                         isRefreshing = true
                                         fetchVideos(this@MainActivity, acc, storage, isRefresh = true)
                                     }
-                                }
+                                },
+                                onClearHistory = { storage.clearHistorial() }
                             )
                         }
                     }
                 }
             }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isPlayingVideo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder().build()
+            enterPictureInPictureMode(params)
         }
     }
 
@@ -181,7 +194,10 @@ class MainActivity : ComponentActivity() {
                         title = it.name,
                         thumbnail = it.thumbnailLink?.replace("=s220", "=s500"),
                         mimeType = it.mimeType,
-                        isFavorite = it.id in favIds
+                        isFavorite = it.id in favIds,
+                        sizeBytes = it.size?.toLongOrNull(),
+                        createdTime = it.createdTime,
+                        durationMillis = it.videoMediaMetadata?.durationMillis
                     )
                 }
 
