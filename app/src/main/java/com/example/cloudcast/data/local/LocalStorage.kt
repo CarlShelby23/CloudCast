@@ -21,7 +21,10 @@ class LocalStorage(context: Context) {
     val favIds: Flow<Set<String>> = _favIds.asStateFlow()
 
     private val _historial = MutableStateFlow(loadHistorial())
+    private val _descargas = MutableStateFlow(loadDescargas())
+
     val historial: Flow<List<HistorialEntry>> = _historial.asStateFlow()
+    val descargas: Flow<List<DownloadRecord>> = _descargas.asStateFlow()
 
     private val _isDarkMode = MutableStateFlow<Boolean?>(loadDarkMode())
     val isDarkMode: Flow<Boolean?> = _isDarkMode.asStateFlow()
@@ -62,6 +65,26 @@ class LocalStorage(context: Context) {
     }
 
     fun getHistorial(): List<HistorialEntry> = _historial.value
+
+    private fun loadDescargas(): List<DownloadRecord> {
+        val json = prefs.getString("descargas_v1", null) ?: return emptyList()
+        return gson.fromJson(json, object : TypeToken<List<DownloadRecord>>() {}.type)
+    }
+
+    fun addDescarga(record: DownloadRecord) {
+        val current = _descargas.value.toMutableList()
+        current.removeAll { it.driveId == record.driveId }
+        current.add(0, record)
+        prefs.edit().putString("descargas_v1", gson.toJson(current)).apply()
+        _descargas.value = current
+    }
+
+    fun removeDescarga(driveId: String) {
+        val current = _descargas.value.toMutableList()
+        current.removeAll { it.driveId == driveId }
+        prefs.edit().putString("descargas_v1", gson.toJson(current)).apply()
+        _descargas.value = current
+    }
 
     private fun loadDarkMode(): Boolean? {
         return if (prefs.contains(KEY_DARK_MODE)) {

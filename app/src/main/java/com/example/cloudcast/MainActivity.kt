@@ -50,12 +50,14 @@ import android.app.DownloadManager
 import android.net.Uri
 import android.os.Environment
 import androidx.core.net.toUri
+import com.example.cloudcast.data.local.DownloadRecord
 
 class MainActivity : ComponentActivity() {
 
     private var isUserLoggedIn by mutableStateOf(false)
     private var videoList by mutableStateOf<List<VideoItem>>(emptyList())
     private var historial by mutableStateOf<List<HistorialEntry>>(emptyList())
+    private var descargas by mutableStateOf<List<DownloadRecord>>(emptyList())
     private var isLoading by mutableStateOf(false)
     private var isRefreshing by mutableStateOf(false)
     private var currentAccessToken by mutableStateOf<String?>(null)
@@ -83,7 +85,12 @@ class MainActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            storage.historial.collectLatest { entries -> historial = entries }
+            launch {
+                storage.historial.collectLatest { entries -> historial = entries }
+            }
+            launch {
+                storage.descargas.collectLatest { entries -> descargas = entries }
+            }
         }
 
         setContent {
@@ -134,13 +141,16 @@ class MainActivity : ComponentActivity() {
                                 onBack = { selectedVideoId = null },
                                 onDownload = {
                                     currentAccessToken?.let { token ->
+                                        val thumbnail = videoList.find { it.id == selectedVideoId }?.thumbnail
                                         download(
                                             context = this@MainActivity,
                                             videoId = selectedVideoId!!,
                                             title = selectedVideoTitle,
-                                            token = token
+                                            thumbnail = thumbnail,
+                                            token = token,
+                                            storage = storage
                                         )
-                                    } ?: Toast.makeText(this@MainActivity, "Error de sesión", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             )
                         }
@@ -148,6 +158,7 @@ class MainActivity : ComponentActivity() {
                             LibraryScreen(
                                 videoList = videoList,
                                 historial = historial,
+                                descargas = descargas,
                                 isRefreshing = isRefreshing,
                                 userEmail = currentAccount?.email ?: "",
                                 userDisplayName = currentAccount?.displayName ?: "Usuario",
@@ -178,7 +189,8 @@ class MainActivity : ComponentActivity() {
                                         fetchVideos(this@MainActivity, acc, storage, isRefresh = true)
                                     }
                                 },
-                                onClearHistory = { storage.clearHistorial() }
+                                onClearHistory = { storage.clearHistorial() },
+                                onRemoveDescarga = { storage.removeDescarga(it) }
                             )
                         }
                     }
@@ -272,7 +284,8 @@ class MainActivity : ComponentActivity() {
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }
 
-    fun download(context: Context, videoId: String, title: String, token: String) {
+    fun download(context: Context, videoId: String, title: String, thumbnail: String?, token: String, storage: LocalStorage) {
+
         val TAG = "CloudCastDownload"
         Log.d(TAG, "--- Iniciando proceso de descarga ---")
         Log.d(TAG, "Video ID: $videoId")
@@ -301,11 +314,13 @@ class MainActivity : ComponentActivity() {
                 setAllowedOverRoaming(true)
             }
 
+
             val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             Log.d(TAG, "DownloadManager obtenido correctamente")
 
             val downloadId = manager.enqueue(request)
             Log.d(TAG, "¡Éxito! Descarga encolada con el ID del sistema: $downloadId")
+            storage.addDescarga(DownloadRecord(videoId, title, thumbnail, downloadId))
 
             Toast.makeText(context, "Descarga iniciada", Toast.LENGTH_SHORT).show()
 

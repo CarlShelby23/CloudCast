@@ -1,5 +1,6 @@
 package com.example.cloudcast.ui.screens
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.cloudcast.data.local.DownloadRecord
 import com.example.cloudcast.data.local.HistorialEntry
 import com.example.cloudcast.domain.model.VideoItem
 
@@ -40,7 +42,8 @@ enum class OrdenVideos(val label: String) {
 enum class TabFiltro(val label: String) {
     TODOS("Todos"),
     FAVORITOS("Favoritos"),
-    HISTORIAL("Historial")
+    HISTORIAL("Historial"),
+    DESCARGAS("Descargas")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +51,8 @@ enum class TabFiltro(val label: String) {
 fun LibraryScreen(
     videoList: List<VideoItem>,
     historial: List<HistorialEntry>,
+    descargas: List<DownloadRecord>,
+    onRemoveDescarga: (String) -> Unit,
     onVideoClick: (String) -> Unit,
     onSignOut: () -> Unit,
     onToggleFavorite: (VideoItem) -> Unit,
@@ -161,6 +166,11 @@ fun LibraryScreen(
                 val idsOrdenados = historial.map { it.driveId }
                 idsOrdenados.mapNotNull { id -> videoList.find { it.id == id } }.distinct()
             }
+            TabFiltro.DESCARGAS -> {
+                val idsOrdenados = historial.map { it.driveId }
+                idsOrdenados.mapNotNull { id -> videoList.find { it.id == id } }.distinct()
+            }
+
         }
 
         val buscado = if (searchQuery.isBlank()) base
@@ -262,7 +272,38 @@ fun LibraryScreen(
             return@Scaffold
         }
 
-        if (listaFiltrada.isEmpty()) {
+        if (tabActiva == TabFiltro.DESCARGAS && descargas.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("📥", fontSize = 48.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Aún no has descargado ningún video", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { tabActiva = TabFiltro.TODOS }) {
+                        Text("Explorar catálogo")
+                    }
+                }
+            }
+            return@Scaffold
+        }
+
+        if (tabActiva == TabFiltro.DESCARGAS) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                items(descargas, key = { it.driveId }) { record ->
+                    DownloadVideoCard(
+                        record = record,
+                        onClick = { onVideoClick(record.driveId) },
+                        onRemove = { onRemoveDescarga(record.driveId) }
+                    )
+                }
+            }
+        } else if (listaFiltrada.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentAlignment = Alignment.Center
@@ -382,6 +423,96 @@ fun VideoCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun DownloadVideoCard(
+    record: DownloadRecord,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val context = LocalContext.current
+    var progress by remember { mutableFloatStateOf(0f) }
+    var status by remember { mutableIntStateOf(android.app.DownloadManager.STATUS_PENDING) }
+    var fileExists by remember { mutableStateOf(true) }
+
+    LaunchedEffect(record.downloadId) {
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+        while (true) {
+            val cursor = manager.query(android.app.DownloadManager.Query().setFilterById(record.downloadId))
+            if (cursor != null && cursor.moveToFirst()) {
+                status = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS))
+                val downloaded = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                val total = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                if (total > 0) progress = downloaded.toFloat() / total.toFloat()
+
+                // EX-01: Validar si el archivo físico sigue ahí una vez que terminó
+                if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                    val localUri = cursor.getString(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_LOCAL_URI))
+                    if (localUri != null) {
+                        val path = android.net.Uri.parse(localUri).path
+                        if (path != null && !java.io.File(path).exists()) {
+                            fileExists = false
+                        }
+                    }
+                }
+                cursor.close()
+                if (status == android.app.DownloadManager.STATUS_SUCCESSFUL || status == android.app.DownloadManager.STATUS_FAILED) break
+            } else {
+                fileExists = false
+                break
+            }
+            kotlinx.coroutines.delay(1000) // Polling cada segundo
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clickable(enabled = fileExists && status == android.app.DownloadManager.STATUS_SUCCESSFUL) { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = record.thumbnail ?: "https://via.placeholder.com/300x400/1C1C2E/FFFFFF?text=Sin+Portada",
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                alpha = if (!fileExists) 0.4f else 1f
+            )
+
+            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)), startY = 200f)))
+
+            if (!fileExists) {
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Rounded.Warning, "Error", tint = Color.Red, modifier = Modifier.size(32.dp))
+                    Text("Archivo borrado", color = Color.White, fontSize = 12.sp)
+                }
+                IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd)) {
+                    Icon(Icons.Rounded.Delete, "Quitar de la lista", tint = Color.White)
+                }
+            } else if (status == android.app.DownloadManager.STATUS_RUNNING || status == android.app.DownloadManager.STATUS_PENDING) {
+                Box(Modifier.align(Alignment.Center).size(48.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(32.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp, trackColor = Color.White.copy(alpha = 0.3f))
+                }
+            } else {
+                Box(Modifier.align(Alignment.Center).size(48.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.PlayArrow, "Reproducir", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+            }
+
+            Text(
+                text = record.title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
             )
         }
     }
