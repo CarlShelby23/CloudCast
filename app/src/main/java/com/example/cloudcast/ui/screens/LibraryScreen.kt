@@ -56,7 +56,9 @@ fun LibraryScreen(
     isRefreshing: Boolean,
     userEmail: String,
     userDisplayName: String,
-    userPhotoUrl: String?
+    userPhotoUrl: String?,
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -105,6 +107,20 @@ fun LibraryScreen(
                     Spacer(Modifier.height(8.dp))
                     Text("${videoList.size} videos en tu Drive", fontSize = 13.sp)
                     Text("${videoList.count { it.isFavorite }} favoritos", fontSize = 13.sp)
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Modo Oscuro", fontSize = 16.sp)
+                        Switch(
+                            checked = isDarkTheme,
+                            onCheckedChange = { onToggleTheme() }
+                        )
+                    }
                 }
             },
             confirmButton = {

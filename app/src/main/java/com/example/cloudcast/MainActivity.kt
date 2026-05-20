@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,7 +75,10 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            CloudCastTheme {
+            val isDarkModePref by storage.isDarkMode.collectAsState(initial = null)
+            val systemTheme = isSystemInDarkTheme()
+            val isDarkTheme = isDarkModePref ?: systemTheme
+            CloudCastTheme(darkTheme = isDarkTheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
                     var selectedVideoId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -121,6 +125,8 @@ class MainActivity : ComponentActivity() {
                                 userEmail = currentAccount?.email ?: "",
                                 userDisplayName = currentAccount?.displayName ?: "Usuario",
                                 userPhotoUrl = currentAccount?.photoUrl?.toString(),
+                                isDarkTheme = isDarkTheme,
+                                onToggleTheme = { storage.toggleDarkMode(systemTheme) },
                                 onVideoClick = { clickedId ->
                                     val video = videoList.find { it.id == clickedId }
                                     selectedVideoId = clickedId
