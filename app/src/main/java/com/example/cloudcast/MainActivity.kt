@@ -46,6 +46,10 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import android.app.DownloadManager
+import android.net.Uri
+import android.os.Environment
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
 
@@ -129,7 +133,14 @@ class MainActivity : ComponentActivity() {
                                 videoTitle = selectedVideoTitle,
                                 onBack = { selectedVideoId = null },
                                 onDownload = {
-                                    Toast.makeText(this@MainActivity, "Descarga no implementada: $selectedVideoTitle", Toast.LENGTH_SHORT).show()
+                                    currentAccessToken?.let { token ->
+                                        download(
+                                            context = this@MainActivity,
+                                            videoId = selectedVideoId!!,
+                                            title = selectedVideoTitle,
+                                            token = token
+                                        )
+                                    } ?: Toast.makeText(this@MainActivity, "Error de sesión", Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
@@ -259,5 +270,57 @@ class MainActivity : ComponentActivity() {
         trySend(isConnected)
 
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+    }
+
+    fun download(context: Context, videoId: String, title: String, token: String) {
+        val TAG = "CloudCastDownload"
+        Log.d(TAG, "--- Iniciando proceso de descarga ---")
+        Log.d(TAG, "Video ID: $videoId")
+        Log.d(TAG, "Título original: $title")
+
+        try {
+            val url = "https://www.googleapis.com/drive/v3/files/${videoId}?alt=media"
+            Log.d(TAG, "URL de descarga generada: $url")
+            Log.d(TAG, "Token disponible: ${token.isNotEmpty()}")
+
+            val fileName = "${title.replace(Regex("[^a-zA-Z0-9.-]"), "_")}.mp4"
+            Log.d(TAG, "Nombre de archivo limpio: $fileName")
+
+            val request = DownloadManager.Request(Uri.parse(url)).apply {
+                setTitle(title)
+                setDescription("Descargando video de CloudCast...")
+                addRequestHeader("Authorization", "Bearer $token")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
+                val dir = Environment.DIRECTORY_MOVIES
+                val subPath = "CloudCast/$fileName"
+                setDestinationInExternalPublicDir(dir, subPath)
+                Log.d(TAG, "Destino configurado en: $dir/$subPath")
+
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(true)
+            }
+
+            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            Log.d(TAG, "DownloadManager obtenido correctamente")
+
+            val downloadId = manager.enqueue(request)
+            Log.d(TAG, "¡Éxito! Descarga encolada con el ID del sistema: $downloadId")
+
+            Toast.makeText(context, "Descarga iniciada", Toast.LENGTH_SHORT).show()
+
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Error de SEGURIDAD. ¿Falta el permiso WRITE_EXTERNAL_STORAGE en el AndroidManifest.xml?", e)
+            Toast.makeText(context, "Error de permisos para guardar el video", Toast.LENGTH_LONG).show()
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Error de ARGUMENTOS. Es posible que la ruta de destino o la URL sean inválidas.", e)
+            Toast.makeText(context, "Error en la ruta del archivo", Toast.LENGTH_LONG).show()
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Error de ESTADO. El DownloadManager podría estar deshabilitado en este dispositivo.", e)
+            Toast.makeText(context, "El gestor de descargas no está disponible", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error GENERAL inesperado al encolar la descarga.", e)
+            Toast.makeText(context, "Error desconocido al descargar", Toast.LENGTH_LONG).show()
+        }
     }
 }
