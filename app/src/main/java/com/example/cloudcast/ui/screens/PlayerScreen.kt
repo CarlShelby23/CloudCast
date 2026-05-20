@@ -54,6 +54,7 @@ fun PlayerScreen(
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
                 .createMediaSource(MediaItem.fromUri(videoUrl))
             setMediaSource(mediaSource)
+            repeatMode = Player.REPEAT_MODE_ONE
             prepare()
             playWhenReady = true
         }
