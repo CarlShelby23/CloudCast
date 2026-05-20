@@ -194,7 +194,16 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onClearHistory = { storage.clearHistorial() },
-                                onRemoveDescarga = { storage.removeDescarga(it) }
+                                onRemoveDescarga = { driveId ->
+                                    val record = descargas.find { it.driveId == driveId }
+
+                                    record?.let {
+                                        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                        manager.remove(it.downloadId)
+                                    }
+
+                                    storage.removeDescarga(driveId)
+                                },
                             )
                         }
                     }

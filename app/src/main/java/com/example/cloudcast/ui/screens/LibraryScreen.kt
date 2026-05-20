@@ -488,13 +488,21 @@ fun DownloadVideoCard(
 
             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)), startY = 200f)))
 
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "Eliminar descarga",
+                    tint = Color.White
+                )
+            }
+
             if (!fileExists) {
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Rounded.Warning, "Error", tint = Color.Red, modifier = Modifier.size(32.dp))
                     Text("Archivo borrado", color = Color.White, fontSize = 12.sp)
-                }
-                IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd)) {
-                    Icon(Icons.Rounded.Delete, "Quitar de la lista", tint = Color.White)
                 }
             } else if (status == android.app.DownloadManager.STATUS_RUNNING || status == android.app.DownloadManager.STATUS_PENDING) {
                 Box(Modifier.align(Alignment.Center).size(48.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape), contentAlignment = Alignment.Center) {
