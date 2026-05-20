@@ -38,6 +38,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 class MainActivity : ComponentActivity() {
 
@@ -78,6 +86,14 @@ class MainActivity : ComponentActivity() {
             val isDarkModePref by storage.isDarkMode.collectAsState(initial = null)
             val systemTheme = isSystemInDarkTheme()
             val isDarkTheme = isDarkModePref ?: systemTheme
+            val context = LocalContext.current
+            val isConnected by context.observeConnectivityAsFlow().collectAsState(initial = true)
+
+            LaunchedEffect(isConnected) {
+                if (!isConnected) {
+                    Toast.makeText(context, "Sin conexión a internet. Revisa tu red", Toast.LENGTH_LONG).show()
+                }
+            }
             CloudCastTheme(darkTheme = isDarkTheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
@@ -220,5 +236,28 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    fun Context.observeConnectivityAsFlow(): Flow<Boolean> = callbackFlow {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { trySend(true) }
+            override fun onLost(network: Network) { trySend(false) }
+            override fun onUnavailable() { trySend(false) }
+        }
+
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+
+        connectivityManager.registerNetworkCallback(request, callback)
+
+        val activeNetwork = connectivityManager.activeNetwork
+        val isConnected = connectivityManager.getNetworkCapabilities(activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        trySend(isConnected)
+
+        awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }
 }
