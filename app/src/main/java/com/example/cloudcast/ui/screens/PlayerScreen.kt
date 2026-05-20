@@ -33,6 +33,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import androidx.media3.datasource.DefaultDataSource
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -48,11 +49,15 @@ fun PlayerScreen(
 
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
-            val dataSourceFactory = DefaultHttpDataSource.Factory().setDefaultRequestProperties(
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory().setDefaultRequestProperties(
                 mapOf("Authorization" to "Bearer $accessToken")
             )
+
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+
             val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
                 .createMediaSource(MediaItem.fromUri(videoUrl))
+
             setMediaSource(mediaSource)
             repeatMode = Player.REPEAT_MODE_ONE
             prepare()

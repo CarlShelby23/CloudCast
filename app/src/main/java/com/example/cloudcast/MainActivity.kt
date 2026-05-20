@@ -133,7 +133,11 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         selectedVideoId != null -> {
-                            val url = "https://www.googleapis.com/drive/v3/files/${selectedVideoId}?alt=media"
+                            val record = descargas.find { it.driveId == selectedVideoId }
+                            val localUri = record?.let { getLocalVideoUri(this@MainActivity, it.downloadId) }
+
+                            val url = localUri ?: "https://www.googleapis.com/drive/v3/files/${selectedVideoId}?alt=media"
+
                             PlayerScreen(
                                 videoUrl = url,
                                 accessToken = currentAccessToken ?: "",
@@ -150,7 +154,7 @@ class MainActivity : ComponentActivity() {
                                             token = token,
                                             storage = storage
                                         )
-                                    }
+                                    } ?: Toast.makeText(this@MainActivity, "Error de sesión", Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
@@ -338,4 +342,19 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(context, "Error desconocido al descargar", Toast.LENGTH_LONG).show()
         }
     }
+}
+
+fun getLocalVideoUri(context: Context, downloadId: Long): String? {
+    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    val cursor = manager.query(DownloadManager.Query().setFilterById(downloadId))
+    if (cursor != null && cursor.moveToFirst()) {
+        val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+            val localUri = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+            cursor.close()
+            return localUri
+        }
+        cursor.close()
+    }
+    return null
 }
