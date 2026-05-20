@@ -276,9 +276,11 @@ fun LibraryScreen(
                         onFavoriteToggle = { onToggleFavorite(video) },
                         onInfoClick = { showInfoForVideo = video },
                         onShare = {
+                            val driveLink = "https://drive.google.com/file/d/${video.id}/view?usp=sharing"
+
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "Mira este video en CloudCast: ${video.title}")
+                                putExtra(Intent.EXTRA_TEXT, "Mira este video en CloudCast: ${video.title}\n$driveLink")
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Compartir video"))
                         }
