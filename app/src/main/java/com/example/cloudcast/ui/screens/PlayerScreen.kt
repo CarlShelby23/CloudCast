@@ -1,7 +1,13 @@
 package com.example.cloudcast.ui.screens
 
 import android.app.Activity
+import android.content.Context
 import android.content.pm.ActivityInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -42,7 +48,8 @@ fun PlayerScreen(
     accessToken: String,
     videoTitle: String,
     onBack: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    faceDownBehavior: String = "PAUSE"
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -70,6 +77,72 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(true) }
 
     var showOverlay by remember { mutableStateOf(true) }
+
+    var isFaceDown by remember { mutableStateOf(false) }
+    var accelZ by remember { mutableStateOf(0f) }
+    var isProximityNear by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
+
+        val accelListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                accelZ = event.values[2]
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+        }
+
+        val proximityListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val maxRange = proximitySensor?.maximumRange ?: 5f
+                // Proximidad activa (objeto cerca) = valor <= 10% del rango máximo o == 0
+                isProximityNear = event.values[0] <= (maxRange * 0.1f).coerceAtLeast(1f)
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
+        }
+
+        accelerometer?.let {
+            sensorManager.registerListener(accelListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        proximitySensor?.let {
+            sensorManager.registerListener(proximityListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+
+        onDispose {
+            sensorManager.unregisterListener(accelListener)
+            sensorManager.unregisterListener(proximityListener)
+        }
+    }
+
+    // Actualizar estado boca abajo: Z < -7 (≈ -9.8 m/s² al estar boca abajo) Y proximidad activa
+    LaunchedEffect(accelZ, isProximityNear) {
+        isFaceDown = accelZ < -7f && isProximityNear
+    }
+
+    // Aplicar comportamiento configurado cuando cambia el estado boca abajo
+    LaunchedEffect(isFaceDown) {
+        val layoutParams = activity?.window?.attributes
+        when {
+            isFaceDown -> when (faceDownBehavior) {
+                "PAUSE" -> exoPlayer.pause()
+                "AUDIO_ONLY" -> {
+                    // Apagar pantalla manteniendo audio: bajar brillo a 0
+                    layoutParams?.screenBrightness = 0f
+                    activity?.window?.attributes = layoutParams
+                }
+            }
+            else -> when (faceDownBehavior) {
+                "PAUSE" -> { /* el usuario reanuda manualmente */ }
+                "AUDIO_ONLY" -> {
+                    // Restaurar brillo del sistema al volver a posición normal
+                    layoutParams?.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    activity?.window?.attributes = layoutParams
+                }
+            }
+        }
+    }
 
     LaunchedEffect(exoPlayer) {
         while (true) {

@@ -63,7 +63,9 @@ fun LibraryScreen(
     userDisplayName: String,
     userPhotoUrl: String?,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    faceDownBehavior: String,
+    onSetFaceDownBehavior: (String) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -124,6 +126,32 @@ fun LibraryScreen(
                         Switch(
                             checked = isDarkTheme,
                             onCheckedChange = { onToggleTheme() }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Pantalla boca abajo",
+                        fontSize = 16.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = faceDownBehavior == "PAUSE",
+                            onClick = { onSetFaceDownBehavior("PAUSE") },
+                            label = { Text("Pausar") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = faceDownBehavior == "AUDIO_ONLY",
+                            onClick = { onSetFaceDownBehavior("AUDIO_ONLY") },
+                            label = { Text("Solo audio") },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }

@@ -29,6 +29,19 @@ class LocalStorage(context: Context) {
     private val _isDarkMode = MutableStateFlow<Boolean?>(loadDarkMode())
     val isDarkMode: Flow<Boolean?> = _isDarkMode.asStateFlow()
 
+    private val _faceDownBehavior = MutableStateFlow(loadFaceDownBehavior())
+    val faceDownBehavior: Flow<String> = _faceDownBehavior.asStateFlow()
+
+    private fun loadFaceDownBehavior(): String =
+        prefs.getString(KEY_FACE_DOWN_BEHAVIOR, "PAUSE") ?: "PAUSE"
+
+    fun setFaceDownBehavior(behavior: String) {
+        prefs.edit().putString(KEY_FACE_DOWN_BEHAVIOR, behavior).apply()
+        _faceDownBehavior.value = behavior
+    }
+
+    fun getFaceDownBehavior(): String = _faceDownBehavior.value
+
     private fun loadFavIds(): Set<String> {
         val json = prefs.getString(KEY_FAV_IDS, null) ?: return emptySet()
         return gson.fromJson(json, object : TypeToken<Set<String>>() {}.type)
@@ -103,6 +116,7 @@ class LocalStorage(context: Context) {
         private const val KEY_FAV_IDS  = "fav_ids"
         private const val KEY_HISTORIAL = "historial"
         private const val KEY_DARK_MODE = "dark_mode"
+        private const val KEY_FACE_DOWN_BEHAVIOR = "face_down_behavior"
 
         @Volatile private var INSTANCE: LocalStorage? = null
 

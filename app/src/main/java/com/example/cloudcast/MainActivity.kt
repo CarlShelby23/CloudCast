@@ -111,6 +111,8 @@ class MainActivity : ComponentActivity() {
                     var selectedVideoId by rememberSaveable { mutableStateOf<String?>(null) }
                     var selectedVideoTitle by rememberSaveable { mutableStateOf("") }
 
+                    val faceDownBehavior by storage.faceDownBehavior.collectAsState(initial = "PAUSE")
+
                     // Actualizamos el estado de reproducción para PiP
                     isPlayingVideo = selectedVideoId != null
 
@@ -143,6 +145,7 @@ class MainActivity : ComponentActivity() {
                                 accessToken = currentAccessToken ?: "",
                                 videoTitle = selectedVideoTitle,
                                 onBack = { selectedVideoId = null },
+                                faceDownBehavior = faceDownBehavior,
                                 onDownload = {
                                     currentAccessToken?.let { token ->
                                         val thumbnail = videoList.find { it.id == selectedVideoId }?.thumbnail
@@ -169,6 +172,8 @@ class MainActivity : ComponentActivity() {
                                 userPhotoUrl = currentAccount?.photoUrl?.toString(),
                                 isDarkTheme = isDarkTheme,
                                 onToggleTheme = { storage.toggleDarkMode(systemTheme) },
+                                faceDownBehavior = faceDownBehavior,
+                                onSetFaceDownBehavior = { storage.setFaceDownBehavior(it) },
                                 onVideoClick = { clickedId ->
                                     val video = videoList.find { it.id == clickedId }
                                     selectedVideoId = clickedId
