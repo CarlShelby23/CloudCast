@@ -81,6 +81,7 @@ fun LibraryScreen(
     var showOrdenMenu      by remember { mutableStateOf(false) }
     var showPerfilDialog   by remember { mutableStateOf(false) }
     var showInfoForVideo   by remember { mutableStateOf<VideoItem?>(null) }
+    var videoToDelete      by remember { mutableStateOf<String?>(null) }
 
     if (showSignOutDialog) {
         AlertDialog(
@@ -99,6 +100,30 @@ fun LibraryScreen(
         )
     }
 
+    if (videoToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { videoToDelete = null },
+            icon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Eliminar descarga", fontWeight = FontWeight.Bold) },
+            text = { Text("¿Estás seguro de que deseas eliminar este video? El archivo se borrará permanentemente del almacenamiento de tu dispositivo.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        videoToDelete?.let { onRemoveDescarga(it) }
+                        videoToDelete = null
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { videoToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     if (showPerfilDialog) {
         AlertDialog(
             onDismissRequest = { showPerfilDialog = false },
@@ -108,7 +133,6 @@ fun LibraryScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Avatar
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -136,7 +160,6 @@ fun LibraryScreen(
                     HorizontalDivider()
                     Spacer(Modifier.height(12.dp))
 
-                    // Modo oscuro
                     SettingRow(
                         label = "Modo oscuro",
                         icon  = if (isDarkTheme) Icons.Rounded.DarkMode else Icons.Rounded.LightMode
@@ -195,7 +218,6 @@ fun LibraryScreen(
                     HorizontalDivider()
                     Spacer(Modifier.height(4.dp))
 
-                    // Cerrar sesión dentro del diálogo
                     TextButton(
                         onClick = { showPerfilDialog = false; showSignOutDialog = true },
                         modifier = Modifier.fillMaxWidth(),
@@ -435,7 +457,7 @@ fun LibraryScreen(
                     DownloadVideoCard(
                         record  = record,
                         onClick = { onVideoClick(record.driveId) },
-                        onRemove = { onRemoveDescarga(record.driveId) }
+                        onRemove = { videoToDelete = record.driveId }
                     )
                 }
             }
