@@ -209,6 +209,21 @@ class MainActivity : ComponentActivity() {
 
                                     storage.removeDescarga(driveId)
                                 },
+                                onDownloadVideo = { videoId ->
+                                    currentAccessToken?.let { token ->
+                                        val videoToDownload = videoList.find { it.id == videoId }
+                                        videoToDownload?.let {
+                                            download(
+                                                context = this@MainActivity,
+                                                videoId = it.id,
+                                                title = it.title,
+                                                thumbnail = it.thumbnail,
+                                                token = token,
+                                                storage = storage
+                                            )
+                                        }
+                                    } ?: Toast.makeText(this@MainActivity, "Error de sesión", Toast.LENGTH_SHORT).show()
+                                }
                             )
                         }
                     }

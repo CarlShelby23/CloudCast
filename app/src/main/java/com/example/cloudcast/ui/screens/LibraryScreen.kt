@@ -62,6 +62,7 @@ fun LibraryScreen(
     onToggleFavorite: (VideoItem) -> Unit,
     onRefresh: () -> Unit,
     onClearHistory: () -> Unit,
+    onDownloadVideo: (String) -> Unit,
     isRefreshing: Boolean,
     userEmail: String,
     userDisplayName: String,
@@ -475,6 +476,7 @@ fun LibraryScreen(
                         onClick         = { onVideoClick(video.id) },
                         onFavoriteToggle = { onToggleFavorite(video) },
                         onInfoClick     = { showInfoForVideo = video },
+                        onDownload      = { onDownloadVideo(video.id) }, // NUEVO: Ejecuta el callback
                         onShare = {
                             val driveLink = "https://drive.google.com/file/d/${video.id}/view?usp=sharing"
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -497,7 +499,8 @@ fun VideoCard(
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onInfoClick: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onDownload: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -573,6 +576,11 @@ fun VideoCard(
                     Icon(Icons.Rounded.MoreVert, contentDescription = "Más opciones", tint = Color.White)
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Descargar") },
+                        onClick = { showMenu = false; onDownload() },
+                        leadingIcon = { Icon(Icons.Rounded.Download, null) }
+                    )
                     DropdownMenuItem(
                         text = { Text("Compartir") },
                         onClick = { showMenu = false; onShare() },
