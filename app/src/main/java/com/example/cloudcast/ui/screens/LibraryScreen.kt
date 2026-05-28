@@ -647,6 +647,7 @@ fun DownloadVideoCard(
                 val downloaded = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
                 val total = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
                 if (total > 0) progress = downloaded.toFloat() / total.toFloat()
+
                 if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                     val localUri = cursor.getString(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_LOCAL_URI))
                     if (localUri != null) {
@@ -679,7 +680,7 @@ fun DownloadVideoCard(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alpha = if (!fileExists) 0.3f else 1f
+                alpha = if (!fileExists || status == android.app.DownloadManager.STATUS_FAILED) 0.3f else 1f
             )
 
             Box(
@@ -713,6 +714,26 @@ fun DownloadVideoCard(
                         Text("Archivo eliminado", color = Color.White, fontSize = 12.sp)
                     }
                 }
+                status == android.app.DownloadManager.STATUS_FAILED -> {
+                    Column(
+                        Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Rounded.ErrorOutline, "Error en descarga", tint = Color(0xFFFB7185), modifier = Modifier.size(36.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text("Descarga fallida", color = Color.White, fontSize = 12.sp)
+                    }
+                }
+                status == android.app.DownloadManager.STATUS_PAUSED -> {
+                    Column(
+                        Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Rounded.WifiOff, "Sin red", tint = Color.LightGray, modifier = Modifier.size(36.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text("Esperando red...", color = Color.White, fontSize = 12.sp)
+                    }
+                }
                 status == android.app.DownloadManager.STATUS_RUNNING ||
                         status == android.app.DownloadManager.STATUS_PENDING -> {
                     Box(
@@ -737,7 +758,7 @@ fun DownloadVideoCard(
                         }
                     }
                 }
-                else -> {
+                status == android.app.DownloadManager.STATUS_SUCCESSFUL -> {
                     Box(
                         Modifier.align(Alignment.Center).size(52.dp)
                             .clip(CircleShape).background(Color.White.copy(0.18f)),
